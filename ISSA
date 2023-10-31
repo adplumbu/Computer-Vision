@@ -1,0 +1,100 @@
+import cv2
+import numpy as np
+
+cam = cv2.VideoCapture("Lane Detection Test Video-01.mp4")
+
+while True:
+    ret, frame = cam.read()
+    if ret is False:
+        break
+
+    shapeList = list(frame.shape[:2])
+    sizeFrame = [int(i/4) for i in shapeList]
+    w,h  = sizeFrame
+
+
+    #resize original frame
+    resize = cv2.resize(frame, (h,w))
+    #grayscale using cvtColor()
+    #gray_frame = cv2.cvtColor(resize, cv2.COLOR_BGR2GRAY) # this is how to create a frame with built-in method cvtColor()
+
+    #grayscale by hand
+    b, g, r = cv2.split(resize) # split the channels of the video Resize
+    grayscale_img = 0.299 * r + 0.587 * g + 0.114 * b # apply formula for grayscale
+    grayscale_img = np.uint8(grayscale_img) #qq convert image in 8 bit unsigned integers
+
+
+    #trapezoid original dimension
+    #black_frame = np.zeros(frame.shape, np.uint8)
+    #lowerLeft = (0, 720)
+    #lowerRight = (1280, 720)
+    #upperLeft = (680, 450)
+    #upperRight = (600, 450)
+    #coord = np.array([upperLeft, upperRight, lowerLeft, lowerRight], np.int32)
+    #trapezoid = cv2.fillConvexPoly(black_frame, coord, (255,255,255))
+
+
+    #trapezoid resized dimension
+    black_frame_resize = np.zeros(resize.shape, np.uint8)
+    upperLeft1 = (170, 135)
+    upperRight1 = (150, 135)
+    lowerLeft1 = (0, 180)
+    lowerRight1 = (320, 180)
+    coord_resized = np.array([upperLeft1, upperRight1, lowerLeft1, lowerRight1], np.int32)
+    trap_resized = cv2.fillConvexPoly(black_frame_resize, coord_resized, (255,255,255))
+    trap_resized = cv2.cvtColor(trap_resized, cv2.COLOR_BGR2GRAY)
+
+    #white trap * resized shape
+    final_trap = trap_resized * grayscale_img
+
+
+
+    #streching the trapezoid so we can perform birds eye view
+    screen_bounds = np.array([[0,0],[320,0],[320,180],[0,180]], np.float32)
+    trap_bounds = np.float32(coord_resized)
+    magic_matrix = cv2.getPerspectiveTransform(trap_bounds, screen_bounds)
+    stretching = cv2.warpPerspective(final_trap, magic_matrix, (h,w))
+
+
+    #bluring the stretched frame:
+    blur = cv2.blur(stretching, (7,7))
+
+    #Sobel Matrix
+    sobel_vertical = np.float32([[-1, -2, -1],
+                                [ 0,  0,  0],
+                                [+1, +2, +1]])
+
+    sobel_horizontal = np.transpose(sobel_vertical)
+
+    sobelVframe = cv2.filter2D(np.float32(blur), -1 , sobel_vertical)
+    sobelHframe = cv2.filter2D(np.float32(blur), -1, sobel_horizontal)
+
+    sobelComplete = np.sqrt((sobelVframe**2) + (sobelHframe**2))
+
+
+    cv2.imshow('Original', frame)
+    cv2.imshow('Resized Frame', resize)
+    #cv2.imshow('Gray Scale', gray_frame)
+    cv2.imshow('Manual Gray Scale', grayscale_img)
+    #cv2.imshow('Trapezoid', trapezoid)
+    cv2.imshow('Trap Resized', trap_resized)
+    cv2.imshow('Gray Trap', final_trap*255)
+    cv2.imshow('Streching', stretching*255)
+    cv2.imshow('Blur', blur*255)
+    cv2.imshow('Sobel Vertical', cv2.convertScaleAbs(sobelVframe))
+    cv2.imshow('Sobel Horizontal', cv2.convertScaleAbs(sobelHframe))
+    cv2.imshow('Complete Sobel', cv2.convertScaleAbs(sobelComplete))
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+
+cam.release()
+cv2.destroyAllWindows()
+
+
+
+
+
+
+
